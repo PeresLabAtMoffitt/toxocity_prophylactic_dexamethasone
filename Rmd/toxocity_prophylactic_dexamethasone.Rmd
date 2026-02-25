@@ -287,34 +287,24 @@ cart <- cart %>%
     crs_other_therapies == "Emapalumab"                ~ "Yes",
     crs_y_n == "Yes"                                   ~ "No"
   )) %>% 
-  mutate(crs_or_icans_dex_given_y_n = case_when(
-    crs_tx_dex_y_n == "Yes"                            ~ "Yes",
-    icans_tx_dex_y_n == "Yes"                          ~ "Yes",
-    crs_tx_dex_y_n == "No" &
-      icans_tx_dex_y_n == "No"                         ~ "No"
-  )) %>% 
-  mutate(crs_and_icans_dex_given_y_n = case_when(
-    crs_tx_dex_y_n == "Yes" &
-      icans_tx_dex_y_n == "Yes"                        ~ "Yes",
-    crs_tx_dex_y_n == "No" &
-      icans_tx_dex_y_n == "No"                         ~ "No"
-  )) %>% 
+  # mutate(crs_or_icans_dex_given_y_n = case_when(
+  #   crs_tx_dex_y_n == "Yes"                            ~ "Yes",
+  #   icans_tx_dex_y_n == "Yes"                          ~ "Yes",
+  #   crs_tx_dex_y_n == "No" &
+  #     icans_tx_dex_y_n == "No"                         ~ "No"
+  # )) %>% 
+  # mutate(crs_and_icans_dex_given_y_n = case_when(
+  #   crs_tx_dex_y_n == "Yes" &
+  #     icans_tx_dex_y_n == "Yes"                        ~ "Yes",
+  #   crs_tx_dex_y_n == "No" &
+  #     icans_tx_dex_y_n == "No"                         ~ "No"
+  # )) %>% 
   mutate(nint_tx_dex_y_n = case_when(
     nint_tx_dex_y_n == "Yes"                           ~ "Yes",
     is.na(nint_tx_dex_y_n) &
       nint_y_n == "Yes"                                ~ "No"
   ))
 
-
-  # date_of_carvykti_d0 # has a weird date format but seems ok
-  # time_from_bridging_to_car_t
-  # carvykti_cell_dose
-  # crs_days_of_tx_dex
-  # crs_tx_dex_given
-  # crs_other_therapies
-  # icans_days_of_tx_dex
-  # icans_tx_dex_given
-  # all crs and icans
 
 ```
 
@@ -400,10 +390,10 @@ cart2 <- cart %>%
            duration(n =1, unit = "days")
   ) %>%
   
-  mutate(day_of_onset_nint_relative_to_infusion =
-           interval(start = date_of_carvykti_d0, end = nint_day_of_onset) /
-           duration(n =1, unit = "days")
-  ) %>%
+  # mutate(day_of_onset_nint_relative_to_infusion =
+  #          interval(start = date_of_carvykti_d0, end = nint_day_of_onset) /
+  #          duration(n =1, unit = "days")
+  # ) %>%
   # mutate(day_of_icans_highest_grade_relative_to_infusion =
   #          interval(start = date_of_carvykti_d0, end = date_of_icans_highest_grade) /
   #          duration(n =1, unit = "days")
@@ -679,16 +669,6 @@ data <- cart3 %>%
 # check_data(data)
 ```
 
-<!-- Issues for nint_d : 1 missing value. I calculated it myself (result in day_of_onset_nint_relative_to_infusion) -->
-```{r}
-# cart3 %>% 
-#   filter(nint_y_n == "Yes") %>% 
-#   select(mrn, nint_y_n, nint_d,
-#          day_of_onset_nint_relative_to_infusion, nint_day_of_onset)
-
-nint_dat <- cart3 %>% 
-  select(mrn, starts_with("updated_dnt"), nint_y_n : nint_other_therapies, day_of_onset_nint_relative_to_infusion)
-```
 
 ```{r Labeling}
 ## Labeling ----
@@ -744,11 +724,11 @@ var_label(cart3) <- list(age_d0 = "Patient age", agecat = "Patient age - Categor
                          crs_toci_given = "Tocilizumab Use (CRS)",
                          crs_anakinra_given = "Anakinra Use (CRS)",
                          crs_emapalumab_given = "Emapalumab Use (CRS)",
-                         crs_tx_dex_y_n = "Dexamethasone Use (CRS) - column CQ",
+                         crs_tx_dex_y_n = "Dexamethasone Use (CRS)",
                          icans_anakinra_given = "Anakinra Use (ICANS)",
-                         icans_tx_dex_y_n = "Dexamethasone Use (ICANS) - column DE",
-                         crs_or_icans_dex_given_y_n = "Dexamethasone Use (CRS or ICANS)",
-                         crs_and_icans_dex_given_y_n = "Dexamethasone Use (CRS and ICANS)",
+                         icans_tx_dex_y_n = "Dexamethasone Use (ICANS)",
+                         # crs_or_icans_dex_given_y_n = "Dexamethasone Use (CRS or ICANS)",
+                         # crs_and_icans_dex_given_y_n = "Dexamethasone Use (CRS and ICANS)",
                          total_cumulative_dose_d_1_d_30_days = "Cumulative steroids received during first 30 days",
                          # proteasome = "Refractory to Proteasome Inhibitors",
                          # lenalidomide_exposed_vs_refractory_vs_not_exposed = "Refractory to Lenalidomide",
@@ -791,10 +771,10 @@ var_label(cart3) <- list(age_d0 = "Patient age", agecat = "Patient age - Categor
                          cnp_duration_days = "CNP Neurotoxicity duration (days)",
                          day_of_onset_cnp_relative_to_infusion = "Day of onset of CNP relative to infusion",
                          
-                         day_of_onset_nint_relative_to_infusion = "Day of onset of NINT relative to infusion (CNP+PK)",
+                         # day_of_onset_nint_relative_to_infusion = "Day of onset of NINT relative to infusion (CNP+PK)",
                          
                          nint_ivig_given = "IVIG Use (NINT)",
-                         nint_tx_dex_y_n = "Dexamethasone Use (NINT) - column DS",
+                         nint_tx_dex_y_n = "Dexamethasone Use (overall NINT) - column DS",
                          any_infection = "Any infection",
                          any_sevinfection = "Any severe infection",
                          severe_infection = "Infection severity",
@@ -802,17 +782,6 @@ var_label(cart3) <- list(age_d0 = "Patient age", agecat = "Patient age - Categor
                          # parkinsonian_neurotoxicity_y_n = "Parkinsonian Neurotoxicity",
                          # other_delayed_non_parkinsonian_neurologic_toxicity_y_n =
                          #   "Other/Delayed Non-Parkinsonian Neurologic Toxicity",
-                         # delayed_neuro_type = "Delayed Neurotoxicity Type",
-                         # hlh = "HLH", hlh_hlh_like_toxicities = "HLH/HLH-Like Toxicities?",
-                         # overall_hlh = "Combined HLHs",
-                         # tbv = "TBV", whole_blood_processed_m_l = "Whole blood processed (mL)",
-                         # final_collection_volume_m_l = "Final collection volume (mL)",
-                         # tbv_processed = "TBV processed",
-                         # access_type = "Access type", total_bags = "Total bags",
-                         # run_time_min = "Run time (min)",
-                         # time_from_apheresis_to_car_t_infusion_days = "Time from apheresis to CAR-T infusion (days)",
-                         # total_dose_volume_m_l = "Total dose volume (mL)",
-                         # carvykti_cell_dose = "Total cell dose (million cells)",
                          updated_cartchar_infusion_dose = "CAR-T infusion dose",
                          # best_ORRcollapsed = "Best ORR at ≤ 12 months",
                          updated_outcomes_resp_d30 = "Response at day 30 (Gabe)",
@@ -833,8 +802,8 @@ var_label(cart3) <- list(age_d0 = "Patient age", agecat = "Patient age - Categor
 
                          best_response_in90days = "Best response in first 90 days",
                          best_response = "Best overall response",
-                         best_ORR = "Best overall ORR response",
-                         best_CRorbetter = "Best overall CR or better response"
+                         best_ORR = "Best ORR",
+                         best_CRorbetter = "Best CR or better"
 )
 
 ```
@@ -955,8 +924,8 @@ cart3 %>%
          icans_anakinra_given, 
          # icans_days_of_tx_dex, icans_tx_dex_given,
          #icans_days_of_anakinra, icans_other_therapies,
-         crs_or_icans_dex_given_y_n,
-         crs_and_icans_dex_given_y_n,
+         # crs_or_icans_dex_given_y_n,
+         # crs_and_icans_dex_given_y_n,
          # crs_icans_days_of_tx_dex, crs_icans_dex_given,
          total_cumulative_dose_d_1_d_30_days,
          ppx_dex_cohort_y_n
@@ -974,6 +943,9 @@ cart3 %>%
   add_stat_label() %>%
   modify_spanning_header(c(stat_1, stat_2) ~ "**Received prophylactic dexamethasone**")
 ```
+For "Emapalumab Use (CRS)", I am assuming the use of Emapalumab is for CRS as the name of the variable is "CRS Other Therapies". 
+I coded "No" for all the patients with CRS any grade that didn't receive Emapalumab.    
+
 <br>
 
 ### NINT
@@ -987,8 +959,8 @@ cart3 %>%
          day_of_onset_cnp_relative_to_infusion,
          
          
-         nint_y_n, #nint_type,
-         day_of_onset_nint_relative_to_infusion, #nint_d,
+         # nint_y_n, #nint_type,
+         # day_of_onset_nint_relative_to_infusion, #nint_d,
          # parkinsonian_neurotoxicity_yes_no,
          
          nint_tx_dex_y_n, #nint_days_of_tx_dex, nint_tx_dex_given,
@@ -1000,8 +972,7 @@ cart3 %>%
               statistic = list(all_continuous() ~ "{median} ({min}, {max})"),
               type = list(c(all_dichotomous()) ~ "categorical",
                           c(day_of_onset_parkinsonian_relative_to_infusion, 
-                            day_of_onset_cnp_relative_to_infusion,
-                            day_of_onset_nint_relative_to_infusion) ~ "continuous")#,
+                            day_of_onset_cnp_relative_to_infusion) ~ "continuous")#,
               # missing = "no"
   ) %>%
   bold_labels() %>%
@@ -1091,7 +1062,8 @@ cart3 %>%
          # response_d90, 
          response_d90_v2,
          ORR_90days, CRorbetter_90days, 
-         best_response_in90days, best_response, 
+         # best_response_in90days, 
+         best_response, 
          best_ORR, best_CRorbetter,
          updated_day_of_prog_relative_to_infusion,
 
@@ -1113,11 +1085,7 @@ cart3 %>%
   add_stat_label() %>%
   modify_spanning_header(c(stat_1, stat_2) ~ "**Received prophylactic dexamethasone**")
 ```
-For "Emapalumab Use (CRS)", I am assuming the use of Emapalumab is for CRS as the name of the variable is "CRS Other Therapies". 
-I coded "No" for all the patients with CRS any grade that didn't receive Emapalumab.    
 
-crs_or_icans_dex_given_y_n "No" are coded so both use of Dex for CRS and ICANS be "No" (if only 1 is "No", then is coded NA).   
-Same for crs_and_icans_dex_given_y_n but coded as both use of Dex for CRS and ICANS be "Yes" to ve coded "Yes".   
 
 ```{r}
 cart3 %>%
