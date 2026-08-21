@@ -45,7 +45,7 @@ path <- fs::path("","Volumes","Peres_Research", "")
 clinical <-
   readxl::read_xlsx(paste0(#path, 
                            here::here(), "/data/raw_data",
-                           "/Carvykti Data Collection 8.5.2026.xlsx"), 
+                           "/Carvykti Data Collection Current 8.20.26.xlsx"), 
                     na = c("NR", "NA", "Na", "unk", "Unk"),
                     skip = 1
                     ) %>% 
@@ -252,6 +252,7 @@ cart <- clinical %>%
       c(0:3)                           ~ "0-3",
     car_hematotox_score_clear > 3      ~ "4+"
   )) %>%
+  mutate(scope_mm = factor(scope_mm, levels = c("Low", "Intermediate", "High"))) |> 
   mutate(ivig_ppx = case_when(
     ivig_ppx == "N"                    ~ "No Prophylaxis",
     ivig_ppx == "Primary"              ~ "Primary Prophylaxis",
@@ -287,6 +288,46 @@ cart <- cart %>%
 
 ```{r treatment}
 cart <- cart %>%
+  mutate(dara = case_when(
+    daratumumab_or_isatuximab_cd38_m_ab_exposed_vs_refractory_vs_not_exposed == "Refractory"            
+                                                                                  ~ "Yes",
+    is.na(daratumumab_or_isatuximab_cd38_m_ab_exposed_vs_refractory_vs_not_exposed)
+                                                                                  ~ NA_character_,
+    TRUE                                                                          ~ "No"
+  ), .after = daratumumab_or_isatuximab_cd38_m_ab_exposed_vs_refractory_vs_not_exposed) %>%
+  mutate(proteasome = case_when(
+    bortezomib_exposed_vs_refractory_vs_not_exposed == "Refractory" |
+      carfilzomib_exposed_vs_refractory_vs_not_exposed == "Refractory"            ~ "Yes",
+    bortezomib_exposed_vs_refractory_vs_not_exposed != "Refractory" |
+      carfilzomib_exposed_vs_refractory_vs_not_exposed != "Refractory"            ~ "No"
+  )) %>%
+  mutate(immuno = case_when(
+    lenalidomide_exposed_vs_refractory_vs_not_exposed == "Refractory" |
+      pomalidomide_exposed_vs_refractory_vs_not_exposed == "Refractory"           ~ "Yes",
+    lenalidomide_exposed_vs_refractory_vs_not_exposed != "Refractory" |
+      pomalidomide_exposed_vs_refractory_vs_not_exposed != "Refractory"           ~ "No"
+  ), .after = pomalidomide_exposed_vs_refractory_vs_not_exposed) %>% 
+  mutate(doubleref = case_when(
+    proteasome == "Yes" &
+      immuno == "Yes"                                                             ~ "Yes",
+    TRUE                                                                          ~ "No"
+  ), .after = proteasome) %>%
+  mutate(tripleref = case_when(
+    proteasome == "Yes" &
+      immuno == "Yes" &
+      dara == "Yes"                                                               ~ "Yes",
+    TRUE                                                                          ~ "No"
+  )) %>% 
+  mutate(pentaref = case_when(
+    bortezomib_exposed_vs_refractory_vs_not_exposed == "Refractory" & 
+      carfilzomib_exposed_vs_refractory_vs_not_exposed == "Refractory" &
+      lenalidomide_exposed_vs_refractory_vs_not_exposed == "Refractory" & 
+      pomalidomide_exposed_vs_refractory_vs_not_exposed == "Refractory" & 
+      dara == "Yes"                                                               ~ "Yes",
+    TRUE                                                                          ~ "No"
+  )) |> 
+  
+  
   mutate(prior_transplant = case_when(
     prior_transplant == "N"            ~ "No",
     TRUE                               ~ prior_transplant
@@ -328,7 +369,9 @@ cart <- cart %>%
     str_detect(bridging_response,
                "SD|PD")                                   ~ "SD/PD",
     TRUE                                                  ~ bridging_response
-  )) |> 
+  ), 
+  bridging_response_cat_pr = factor(bridging_response_cat_pr),
+  bridging_response_cat_pr = relevel(bridging_response_cat_pr, ref = "SD/PD")) |> 
   mutate(bridging_response_cat2pr = case_when(
     bridging_therapy_y_n == "No"                          ~ "No bridging",
     str_detect(bridging_response,
@@ -440,7 +483,7 @@ cart2 <- cart %>%
                                                                 crs_early_intervention_toci_y_n)
   )) |> 
   mutate(hospitalized_for_crs_icans = case_when(
-    crs_any == "No"                                     ~ NA_character_,
+    crs_any == "No" &
     icans_any == "No"                                   ~ NA_character_,
     hospitalized_for_crs_icans == "Y"                   ~ "Yes",
     hospitalized_for_crs_icans == "Admitted"            ~"Admitted Prior to First CRS/ICANS"
@@ -449,12 +492,32 @@ cart2 <- cart %>%
     hospitalized_for_crs_icans == "Yes"                 ~ total_days_of_hospitalization_for_crs_icans
   )) |> 
   # NINT----
-  # mutate(parkinsonian_neurotoxicity_yes_no = case_when(
-  #   nint_y_n == "No"                                   ~ "No",
-  #   str_detect(nint_type, "Parkinsonism")              ~ "Yes",
-  #   !is.na(nint_type)                                  ~ "No",
-  #   nint_y_n == "Yes"                                  ~ "Unk"
-  # )) %>%
+  mutate(parkinsonian_neurotoxicity_yes_no = case_when(
+    nint_y_n == "No"                                   ~ "No",
+    str_detect(nint_type, "Parkinsonism")              ~ "Yes",
+    !is.na(nint_type)                                  ~ "No",
+    nint_y_n == "Yes"                                  ~ "Unk"
+  )) |> 
+  mutate(cnp_neurotoxicity_yes_no = case_when(
+    nint_y_n == "No"                                   ~ "No",
+    str_detect(nint_type, "CNP")                       ~ "Yes",
+    !is.na(nint_type)                                  ~ "No",
+    nint_y_n == "Yes"                                  ~ "Unk"
+  )) |> 
+  mutate(cnp_and_parkinsonian_neurotoxicity_yes_no = case_when(
+    nint_y_n == "No"                                   ~ "No",
+    str_detect(nint_type, "CNP") &
+      str_detect(nint_type, "Parkinsonism")            ~ "Yes",
+    !is.na(nint_type)                                  ~ "No",
+    nint_y_n == "Yes"                                  ~ "Unk"
+  )) |> 
+  mutate(cnp_and_nonparkinsonian_neurotoxicity_yes_no = case_when(
+    nint_y_n == "No"                                   ~ "No",
+    str_detect(nint_type, "CNP") &
+      str_detect(nint_type, "PRES|LMN")                ~ "Yes",
+    !is.na(nint_type)                                  ~ "No",
+    nint_y_n == "Yes"                                  ~ "Unk"
+  )) |> 
   # mutate(parkinsonian_neurotoxicity_duration_days =
   #          interval(start = updated_dnt_parkinsononset_dt, end = updated_dnt_parkinsonlatest_dt) /
   #          duration(n =1, unit = "days")
@@ -538,7 +601,7 @@ cart3 <- cart2 %>%
   mutate(pfs_event = case_when(
     !is.na(date_of_progression)                     ~ 1,
     os_event == 1                                   ~ 1,
-    !is.na(date_of_progression)                     ~ 0
+    !is.na(date_of_last_visit_contact)              ~ 0
   )) %>%
   mutate(pfs_date = case_when(
     !is.na(date_of_progression)                     ~ date_of_progression,
@@ -858,6 +921,7 @@ var_label(cart3) <- list(age_d0 = "Patient age", agecat = "Patient age - Categor
                          # tpo_agonist_post_cart_yes_1_no_0 = "Thrombopoietin (TPO) agonist",
                          # bmicat = "BMI at apheresis - Normal, Overweight, Obese",
                          # steroid_use_y_n = "Steroid Use",
+                         ppx_dex_cohort_y_n = "Received prophylactic dexamethasone",
                          crs_toci_given = "Tocilizumab Use (CRS)",
                          crs_anakinra_given = "Anakinra Use (CRS)",
                          crs_emapalumab_given = "Emapalumab Use (CRS)",
@@ -867,14 +931,15 @@ var_label(cart3) <- list(age_d0 = "Patient age", agecat = "Patient age - Categor
                          # crs_or_icans_dex_given_y_n = "Dexamethasone Use (CRS or ICANS)",
                          # crs_and_icans_dex_given_y_n = "Dexamethasone Use (CRS and ICANS)",
                          total_cumulative_dose_d_1_d_30_days = "Cumulative steroids received during first 30 days",
-                         # proteasome = "Refractory to Proteasome Inhibitors",
-                         # lenalidomide_exposed_vs_refractory_vs_not_exposed = "Refractory to Lenalidomide",
-                         # bortezomib_exposed_vs_refractory_vs_not_exposed = "Refractory to Bortezomib",
-                         # carfilzomib_exposed_vs_refractory_vs_not_exposed = "Refractory to Carfilzomib",
-                         # pomalidomide_exposed_vs_refractory_vs_not_exposed = "Refractory to Pomalidomide",
-                         # dara = "Refractory to Daratumumab or Isatuximab",
-                         # immuno = "Refractory to Immunomodulators", doubleref = "Double refractory",
-                         # tripleref= "Triple refractory", pentaref= "Penta refractory",
+                         proteasome = "Refractory to Proteasome Inhibitors",
+                         lenalidomide_exposed_vs_refractory_vs_not_exposed = "Refractory to Lenalidomide",
+                         bortezomib_exposed_vs_refractory_vs_not_exposed = "Refractory to Bortezomib",
+                         carfilzomib_exposed_vs_refractory_vs_not_exposed = "Refractory to Carfilzomib",
+                         pomalidomide_exposed_vs_refractory_vs_not_exposed = "Refractory to Pomalidomide",
+                         dara = "Refractory to Daratumumab or Isatuximab",
+                         immuno = "Refractory to Immunomodulators", doubleref = "Double refractory",
+                         tripleref= "Triple refractory",
+                         pentaref= "Penta refractory",
                          # bmicat2 = "BMI at apheresis - Normal vs. Overweight/Obese",
                          hospital_admit_y_n = "Required hospitalization",
                          hospitalized_for_crs_icans = "Required hospitalization for CRS/ICANS",
@@ -902,6 +967,10 @@ var_label(cart3) <- list(age_d0 = "Patient age", agecat = "Patient age - Categor
                          icans_duration_days = "Duration of ICANS (days)",
                          nint_y_n = "NINT (Parkinsonian + CNP)",
                          nint_type = "NINT type",
+                         parkinsonian_neurotoxicity_yes_no = "Parkinsonian Neurotoxicity",
+                         cnp_neurotoxicity_yes_no = "CNP Neurotoxicity",
+                         cnp_and_parkinsonian_neurotoxicity_yes_no = "CNP + Parkinsonian Neurotoxicity",
+                         cnp_and_nonparkinsonian_neurotoxicity_yes_no = "CNP + Non Parkinsonian Neurotoxicity",
                          # updated_dnt_parkinson_yn = "Parkinsonian NT",
                          # parkinsonian_neurotoxicity_duration_days = "Parkinsonian NT duration (days)",
                          # updated_dnt_parkinsonresolved_yn = "Parkinsonian NT resolved",
@@ -945,8 +1014,8 @@ var_label(cart3) <- list(age_d0 = "Patient age", agecat = "Patient age - Categor
 
                          best_response_in90days = "Best response in first 90 days",
                          best_response = "Best overall response",
-                         best_ORR = "Best ORR",
-                         best_CRorbetter = "Best CR or better"
+                         best_ORR = "Best overall ORR",
+                         best_CRorbetter = "Best overall CR or better"
 )
 
 ```
@@ -979,18 +1048,20 @@ cart3 %>%
   modify_spanning_header(c(stat_1, stat_2) ~ "**Received prophylactic dexamethasone - IQR**")
 
 cart3 %>%
-  select(age_d0, agecat, #male_sex,
+  select(os_time_from_infusion_months,,
+         age_d0, agecat, #male_sex,
          sex_m_f, race, race_all,
          ecog_performance_status, ecog_cat,
-         os_time_from_infusion_months,
+         
          time_since_diagnosis_to_d0_years,
          extramedullary_disease_y_n, # updated_bximag_imaging_emd_yn_preinf,
          cytogenetic_risk,
          r_iss_staging_2,
          # updated_r_iss,
+         immuno, proteasome, dara, doubleref, tripleref, pentaref, 
          number_of_prior_therapies,
          number_prior_lines_therapy_cat12, number_prior_lines_therapy_cat13,
-         prior_transplant, prior_auto_sct_y_n, prior_allo_sct_y_n,
+         prior_transplant, #prior_auto_sct_y_n, prior_allo_sct_y_n,
          bm_bx_pre_bridging_50_percent_plasma_cells,
          scope_mm,
          bridging_therapy_y_n,
@@ -1009,6 +1080,10 @@ cart3 %>%
          # updated_cartchar_infusion_dose,
          alc_aph_k_m_l, cd4_cells_aph, cd8_cells_aph,
          cd19_cells_aph, nk_cells_aph,
+         anc_d_90, plt_d_90,
+         hgb_d_90, alc_d_90,
+         cd4_cells_d_90, cd8_cells_d_90,
+         cd19_cells_d_90, nk_cells_d_90,
          ppx_dex_cohort_y_n) %>%
   tbl_summary(by = ppx_dex_cohort_y_n,
               type = list(
@@ -1053,6 +1128,9 @@ cart3 %>%
          peak_alc, peak_alc_grouping_recoded,
          # peak_alc_grouping,
          alc_treated,
+         any_infection, any_sevinfection,
+         severity_infection, # severe_infection,
+         
          crs_highest_grade, crs_any, #crs_y_n,
          crs_gradecat2, crs_gradecat3,
          gr2_crs, gr3_crs,
@@ -1105,7 +1183,14 @@ I coded "No" for all the patients with CRS any grade that didn't receive Emapalu
 ### NINT
 ```{r}
 cart3 %>%
-  select(#updated_dnt_parkinson_yn,
+  select(nint_type) |> 
+  tbl_summary()
+         
+cart3 %>%
+  select(parkinsonian_neurotoxicity_yes_no, 
+         cnp_neurotoxicity_yes_no, 
+         cnp_and_parkinsonian_neurotoxicity_yes_no, 
+         cnp_and_nonparkinsonian_neurotoxicity_yes_no,
          # updated_dnt_parkinsonresolved_yn,
          # day_of_onset_parkinsonian_relative_to_infusion,
          # updated_dnt_cnp_yn,
@@ -1117,16 +1202,15 @@ cart3 %>%
          day_of_onset_nint_relative_to_infusion, #nint_d,
          # parkinsonian_neurotoxicity_yes_no,
 
-         nint_tx_dex_y_n, #nint_days_of_tx_dex, nint_tx_dex_given,
-         nint_ivig_given, #nint_other_therapies,
+         # nint_tx_dex_y_n, #nint_days_of_tx_dex, nint_tx_dex_given,
+         # nint_ivig_given, #nint_other_therapies,
          ppx_dex_cohort_y_n
          ) %>%
   tbl_summary(by = ppx_dex_cohort_y_n,
               digits = all_continuous() ~ 1,
               statistic = list(all_continuous() ~ "{median} ({min}, {max})"),
-              type = list(c(all_dichotomous()) ~ "categorical"#,
-                          # c(day_of_onset_parkinsonian_relative_to_infusion,
-                          #   day_of_onset_cnp_relative_to_infusion) ~ "continuous"
+              type = list(c(all_dichotomous()) ~ "categorical",
+                          c(day_of_onset_nint_relative_to_infusion) ~ "continuous"
                           )#,
               # missing = "no"
   ) %>%
@@ -1207,9 +1291,7 @@ cart3 %>%
 ## Table 3. Efficacy/response
 ```{r table 2 outcome}
 cart3 %>%
-  select(any_infection, any_sevinfection,
-         severity_infection, # severe_infection,
-         # d_30,
+  select(# d_30,
          # response_d30,
          response_d30_v2,
          ORR_30days, CRorbetter_30days,
@@ -1217,19 +1299,14 @@ cart3 %>%
          # response_d90,
          response_d90_v2,
          ORR_90days, CRorbetter_90days,
-         # best_response_in90days,
+         best_response_in90days,
          best_response,
          best_ORR, best_CRorbetter,
          # updated_day_of_prog_relative_to_infusion,
-         nrm_response,
-         nrm_response_d90,
-         mortality,
-         updated_day_of_death_relative_to_infusion,
-
-         anc_d_90, plt_d_90,
-         hgb_d_90, alc_d_90,
-         cd4_cells_d_90, cd8_cells_d_90,
-         cd19_cells_d_90, nk_cells_d_90,
+         # nrm_response,
+         # nrm_response_d90,
+         # mortality,
+         # updated_day_of_death_relative_to_infusion,
          ppx_dex_cohort_y_n) %>%
   tbl_summary(by = ppx_dex_cohort_y_n,
               type = list(
@@ -1466,33 +1543,34 @@ ggsurvplot(survfit(Surv(os_time_from_infusion_months, nrm_response) ~ ppx_dex_co
 Model 1 = CAR-HEMATOTOX + BM PCs >50% + EMD + bridging response + penta-refractory status
 ```{r}
 coxph(Surv(time = cart3$os_time_from_infusion_months,
-           event = cart3$os_event) ~ car_hematotox_score_aph_cat + 
+           event = cart3$os_event) ~ ppx_dex_cohort_y_n + car_hematotox_score_aph_cat +
         bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
-        bridging_response_cat_vgpr,# + pentaref, 
+        bridging_response_cat_vgpr + pentaref,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
   add_nevent(location = "level") %>% add_n(location = "level")
 ```
 
-Model 2 = Model 1 + ECOG PS ≥2
+Model 2 = Model 1 + ECOG PS ≥2.   
+The model cannot be estimated because of complete separation of values for ECOG.
 ```{r}
-coxph(Surv(time = cart3$os_time_from_infusion_months,
-           event = cart3$os_event) ~ car_hematotox_score_aph_cat + 
-        bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
-        bridging_response_cat_vgpr + #pentaref + 
-        ecog_cat, 
-      data = cart3)  %>%
-  tbl_regression(exponentiate = TRUE) %>%
-  bold_p(t = .05) %>%
-  add_nevent(location = "level") %>% add_n(location = "level")
+# coxph(Surv(time = cart3$os_time_from_infusion_months,
+#            event = cart3$os_event) ~ ppx_dex_cohort_y_n + car_hematotox_score_aph_cat +
+#         bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
+#         bridging_response_cat_vgpr + pentaref +
+#         ecog_cat,
+#       data = cart3)  %>%
+#   tbl_regression(exponentiate = TRUE) %>%
+#   bold_p(t = .05) %>%
+#   add_nevent(location = "level") %>% add_n(location = "level")
 ```
 
 Model 3 = SCOPE-MM, bridging response, penta-refractory status
 ```{r}
 coxph(Surv(time = cart3$os_time_from_infusion_months,
-           event = cart3$os_event) ~ scope_mm + 
-        bridging_response_cat_vgpr,# + pentaref, 
+           event = cart3$os_event) ~ ppx_dex_cohort_y_n + scope_mm +
+        bridging_response_cat_vgpr + pentaref,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
@@ -1502,9 +1580,9 @@ coxph(Surv(time = cart3$os_time_from_infusion_months,
 Model 4 = Model 3 + ECOG PS ≥2
 ```{r}
 coxph(Surv(time = cart3$os_time_from_infusion_months,
-           event = cart3$os_event) ~ scope_mm + 
-        bridging_response_cat_vgpr + #pentaref + 
-      ecog_cat, 
+           event = cart3$os_event) ~ ppx_dex_cohort_y_n + scope_mm +
+        bridging_response_cat_vgpr + pentaref +
+      ecog_cat,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
@@ -1512,62 +1590,12 @@ coxph(Surv(time = cart3$os_time_from_infusion_months,
 ```
 
 ## PFS
-Model 1 = CAR-HEMATOTOX + BM PCs >50% + EMD + bridging response + __penta-refractory status__
-```{r}
-coxph(Surv(time = cart3$pfs_time_from_infusion_months,
-           event = cart3$pfs_event) ~ car_hematotox_score_aph_cat + 
-        bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
-        bridging_response_cat_vgpr,# + pentaref, 
-      data = cart3)  %>%
-  tbl_regression(exponentiate = TRUE) %>%
-  bold_p(t = .05) %>%
-  add_nevent(location = "level") %>% add_n(location = "level")
-```
-
-Model 2 = Model 1 + ECOG PS ≥2
-```{r}
-coxph(Surv(time = cart3$pfs_time_from_infusion_months,
-           event = cart3$pfs_event) ~ car_hematotox_score_aph_cat + 
-        bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
-        bridging_response_cat_vgpr + #pentaref + 
-        ecog_cat, 
-      data = cart3)  %>%
-  tbl_regression(exponentiate = TRUE) %>%
-  bold_p(t = .05) %>%
-  add_nevent(location = "level") %>% add_n(location = "level")
-```
-
-Model 3 = SCOPE-MM, bridging response, _penta-refractory status_
-```{r}
-coxph(Surv(time = cart3$pfs_time_from_infusion_months,
-           event = cart3$pfs_event) ~ scope_mm + 
-        bridging_response_cat_vgpr,# + pentaref, 
-      data = cart3)  %>%
-  tbl_regression(exponentiate = TRUE) %>%
-  bold_p(t = .05) %>%
-  add_nevent(location = "level") %>% add_n(location = "level")
-```
-
-Model 4 = Model 3 + ECOG PS ≥2
-```{r}
-coxph(Surv(time = cart3$pfs_time_from_infusion_months,
-           event = cart3$pfs_event) ~ scope_mm + 
-        bridging_response_cat_vgpr + #pentaref + 
-        ecog_cat, 
-      data = cart3)  %>%
-  tbl_regression(exponentiate = TRUE) %>%
-  bold_p(t = .05) %>%
-  add_nevent(location = "level") %>% add_n(location = "level")
-```
-
-# MVA (bridging response as PR or better)
-## OS 
 Model 1 = CAR-HEMATOTOX + BM PCs >50% + EMD + bridging response + penta-refractory status
 ```{r}
-coxph(Surv(time = cart3$os_time_from_infusion_months,
-           event = cart3$os_event) ~ car_hematotox_score_aph_cat + 
+coxph(Surv(time = cart3$pfs_time_from_infusion_months,
+           event = cart3$pfs_event) ~ ppx_dex_cohort_y_n + car_hematotox_score_aph_cat +
         bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
-        bridging_response_cat_pr,# + pentaref, 
+        bridging_response_cat_vgpr + pentaref,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
@@ -1576,11 +1604,11 @@ coxph(Surv(time = cart3$os_time_from_infusion_months,
 
 Model 2 = Model 1 + ECOG PS ≥2
 ```{r}
-coxph(Surv(time = cart3$os_time_from_infusion_months,
-           event = cart3$os_event) ~ car_hematotox_score_aph_cat + 
+coxph(Surv(time = cart3$pfs_time_from_infusion_months,
+           event = cart3$pfs_event) ~ ppx_dex_cohort_y_n + car_hematotox_score_aph_cat +
         bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
-        bridging_response_cat_pr + #pentaref + 
-        ecog_cat, 
+        bridging_response_cat_vgpr + pentaref +
+        ecog_cat,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
@@ -1589,9 +1617,60 @@ coxph(Surv(time = cart3$os_time_from_infusion_months,
 
 Model 3 = SCOPE-MM, bridging response, penta-refractory status
 ```{r}
+coxph(Surv(time = cart3$pfs_time_from_infusion_months,
+           event = cart3$pfs_event) ~ ppx_dex_cohort_y_n + scope_mm +
+        bridging_response_cat_vgpr + pentaref,
+      data = cart3)  %>%
+  tbl_regression(exponentiate = TRUE) %>%
+  bold_p(t = .05) %>%
+  add_nevent(location = "level") %>% add_n(location = "level")
+```
+
+Model 4 = Model 3 + ECOG PS ≥2
+```{r}
+coxph(Surv(time = cart3$pfs_time_from_infusion_months,
+           event = cart3$pfs_event) ~ ppx_dex_cohort_y_n + scope_mm +
+        bridging_response_cat_vgpr + pentaref +
+        ecog_cat,
+      data = cart3)  %>%
+  tbl_regression(exponentiate = TRUE) %>%
+  bold_p(t = .05) %>%
+  add_nevent(location = "level") %>% add_n(location = "level")
+```
+
+# MVA (bridging response as PR or better)
+## OS
+Model 1 = CAR-HEMATOTOX + BM PCs >50% + EMD + bridging response + penta-refractory status.
+```{r}
 coxph(Surv(time = cart3$os_time_from_infusion_months,
-           event = cart3$os_event) ~ scope_mm + 
-        bridging_response_cat_pr,# + pentaref, 
+           event = cart3$os_event) ~ ppx_dex_cohort_y_n + car_hematotox_score_aph_cat +
+        bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
+        bridging_response_cat_pr + pentaref,
+      data = cart3)  %>%
+  tbl_regression(exponentiate = TRUE) %>%
+  bold_p(t = .05) %>%
+  add_nevent(location = "level") %>% add_n(location = "level")
+```
+
+Model 2 = Model 1 + ECOG PS ≥2.  
+The model cannot be estimated because of complete separation of values for ECOG.
+```{r}
+# coxph(Surv(time = cart3$os_time_from_infusion_months,
+#            event = cart3$os_event) ~ ppx_dex_cohort_y_n + car_hematotox_score_aph_cat +
+#         bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
+#         bridging_response_cat_pr + pentaref +
+#         ecog_cat,
+#       data = cart3)  %>%
+#   tbl_regression(exponentiate = TRUE) %>%
+#   bold_p(t = .05) %>%
+#   add_nevent(location = "level") %>% add_n(location = "level")
+```
+
+Model 3 = SCOPE-MM, bridging response, penta-refractory status
+```{r}
+coxph(Surv(time = cart3$os_time_from_infusion_months,
+           event = cart3$os_event) ~ ppx_dex_cohort_y_n + scope_mm +
+        bridging_response_cat_pr + pentaref,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
@@ -1601,22 +1680,22 @@ coxph(Surv(time = cart3$os_time_from_infusion_months,
 Model 4 = Model 3 + ECOG PS ≥2
 ```{r}
 coxph(Surv(time = cart3$os_time_from_infusion_months,
-           event = cart3$os_event) ~ scope_mm + 
-        bridging_response_cat_pr + #pentaref + 
-      ecog_cat, 
+           event = cart3$os_event) ~ ppx_dex_cohort_y_n + scope_mm +
+        bridging_response_cat_pr + pentaref +
+      ecog_cat,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
   add_nevent(location = "level") %>% add_n(location = "level")
 ```
 
-# PFS
-Model 1 = CAR-HEMATOTOX + BM PCs >50% + EMD + bridging response + __penta-refractory status__
+## PFS
+Model 1 = CAR-HEMATOTOX + BM PCs >50% + EMD + bridging response + penta-refractory status
 ```{r}
 coxph(Surv(time = cart3$pfs_time_from_infusion_months,
-           event = cart3$pfs_event) ~ car_hematotox_score_aph_cat + 
+           event = cart3$pfs_event) ~ ppx_dex_cohort_y_n + car_hematotox_score_aph_cat +
         bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
-        bridging_response_cat_pr,# + pentaref, 
+        bridging_response_cat_pr + pentaref,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
@@ -1626,21 +1705,21 @@ coxph(Surv(time = cart3$pfs_time_from_infusion_months,
 Model 2 = Model 1 + ECOG PS ≥2
 ```{r}
 coxph(Surv(time = cart3$pfs_time_from_infusion_months,
-           event = cart3$pfs_event) ~ car_hematotox_score_aph_cat + 
+           event = cart3$pfs_event) ~ ppx_dex_cohort_y_n + car_hematotox_score_aph_cat +
         bm_bx_pre_bridging_50_percent_plasma_cells + extramedullary_disease_y_n +
-        bridging_response_cat_pr + #pentaref + 
-        ecog_cat, 
+        bridging_response_cat_pr + pentaref +
+        ecog_cat,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
   add_nevent(location = "level") %>% add_n(location = "level")
 ```
 
-Model 3 = SCOPE-MM, bridging response, _penta-refractory status_
+Model 3 = SCOPE-MM, bridging response, penta-refractory status
 ```{r}
 coxph(Surv(time = cart3$pfs_time_from_infusion_months,
-           event = cart3$pfs_event) ~ scope_mm + 
-        bridging_response_cat_pr,# + pentaref, 
+           event = cart3$pfs_event) ~ ppx_dex_cohort_y_n + scope_mm +
+        bridging_response_cat_pr + pentaref,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
@@ -1650,9 +1729,9 @@ coxph(Surv(time = cart3$pfs_time_from_infusion_months,
 Model 4 = Model 3 + ECOG PS ≥2
 ```{r}
 coxph(Surv(time = cart3$pfs_time_from_infusion_months,
-           event = cart3$pfs_event) ~ scope_mm + 
-        bridging_response_cat_pr + #pentaref + 
-        ecog_cat, 
+           event = cart3$pfs_event) ~ ppx_dex_cohort_y_n + scope_mm +
+        bridging_response_cat_pr + pentaref +
+        ecog_cat,
       data = cart3)  %>%
   tbl_regression(exponentiate = TRUE) %>%
   bold_p(t = .05) %>%
